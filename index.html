@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="clair">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="My Dream Job — Agrégateur d'offres d'emploi en temps réel pour les Pays de la Loire (communication, marketing, digital)">
+    <meta name="keywords" content="emploi, Pays de la Loire, communication, marketing, Angers, Nantes, CDI, CDD">
+    <title>My Dream Job ✨ — Offres d'emploi Pays de la Loire</title>
+
+    <!-- Favicon emoji -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✨</text></svg>">
+
+    <!-- Google Fonts : Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Feuille de style principale -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ===================== BARRE DE CHARGEMENT ===================== -->
+<div id="loading-bar" role="progressbar" aria-label="Chargement en cours">
+    <div id="progress-fill"></div>
+</div>
+
+<!-- ===================== SPINNER GLOBAL ===================== -->
+<div id="spinner-global" role="status" aria-live="polite">
+    <div class="spinner-cercle"></div>
+    <span class="spinner-texte">Chargement des offres...</span>
+</div>
+
+<!-- ===================== NOTIFICATIONS TOAST ===================== -->
+<div id="toast-container" aria-live="polite" aria-atomic="false"></div>
+
+<!-- ===================== HEADER ===================== -->
+<header id="header" role="banner">
+    <div class="header-logo">
+        <span class="header-logo-icone" aria-hidden="true">✨</span>
+        <div>
+            <div class="header-logo-titre">My Dream Job</div>
+            <span class="header-logo-sous-titre">Pays de la Loire · Emploi en temps réel</span>
+        </div>
+    </div>
+
+    <div class="header-stats">
+        <!-- Compteur total -->
+        <div class="stat-item" title="Nombre total d'offres trouvées">
+            <span aria-hidden="true">💼</span>
+            <span class="stat-valeur" id="compteur-offres-total">0</span>
+            <span class="stat-label">offre(s)</span>
+        </div>
+
+        <!-- Compteur Angers -->
+        <div class="stat-item" title="Offres à Angers (49)">
+            <span aria-hidden="true">🔔</span>
+            <span class="stat-valeur" id="compteur-angers">0</span>
+            <span class="stat-label">Angers</span>
+            <span id="badge-angers" class="badge-angers-count" style="display:none;" aria-live="polite"></span>
+        </div>
+
+        <!-- Compte à rebours -->
+        <div class="stat-item" title="Prochaine actualisation automatique">
+            <div>
+                <span class="countdown-label">Prochaine actualisation dans</span>
+                <span class="countdown-timer" id="compte-a-rebours" aria-live="polite">60:00</span>
+            </div>
+        </div>
+
+        <!-- Dernière actualisation -->
+        <div class="stat-item">
+            <span class="derniere-actu" id="derniere-actualisation">Jamais actualisé</span>
+        </div>
+    </div>
+
+    <div class="header-actions">
+        <button id="btn-actualiser" class="btn-header" title="Actualiser les offres maintenant" aria-label="Actualiser les offres">
+            🔄 Actualiser maintenant
+        </button>
+        <button id="toggle-theme" class="btn-header" title="Basculer le thème sombre/clair" aria-label="Basculer le thème">
+            🌙
+        </button>
+        <button id="btn-son" class="btn-header" title="Activer/désactiver le son des notifications" aria-label="Son des notifications">
+            🔕
+        </button>
+        <button id="btn-parametres" class="btn-header" title="Configurer les clés API" aria-label="Paramètres">
+            ⚙️ Paramètres
+        </button>
+    </div>
+</header>
+
+<!-- ===================== LAYOUT PRINCIPAL ===================== -->
+<div id="layout">
+
+    <!-- ===== SIDEBAR GAUCHE ===== -->
+    <aside id="sidebar" role="complementary" aria-label="Filtres et navigation">
+
+        <!-- Recherche et tri -->
+        <section class="sidebar-section">
+            <h2 class="sidebar-titre">🔍 Recherche</h2>
+            <div style="margin-bottom:10px;">
+                <input type="search" id="input-recherche" placeholder="Rechercher dans les offres..."
+                    aria-label="Rechercher dans les offres d'emploi">
+            </div>
+            <select id="select-tri" aria-label="Trier les offres par">
+                <option value="date">📅 Plus récent d'abord</option>
+                <option value="fiabilite">⭐ Par fiabilité</option>
+                <option value="pertinence">🎯 Par pertinence</option>
+                <option value="entreprise">🏢 Par entreprise</option>
+            </select>
+        </section>
+
+        <!-- Filtres période -->
+        <section class="sidebar-section">
+            <h2 class="sidebar-titre">📅 Date de publication</h2>
+            <div class="filtres-periode-wrap" role="group" aria-label="Filtrer par date">
+                <button class="filtre-periode actif" data-periode="tout">Toutes</button>
+                <button class="filtre-periode" data-periode="aujourd-hui">Aujourd'hui</button>
+                <button class="filtre-periode" data-periode="semaine">Cette semaine</button>
+                <button class="filtre-periode" data-periode="mois">Ce mois</button>
+                <button class="filtre-periode" data-periode="ancien">Plus ancien</button>
+            </div>
+        </section>
+
+        <!-- Filtres département -->
+        <section class="sidebar-section">
+            <h2 class="sidebar-titre">
+                📍 Départements
+                <span class="sidebar-titre-badge">5</span>
+            </h2>
+            <div id="filtres-departements" role="group" aria-label="Filtrer par département">
+                <!-- Généré par JS -->
+            </div>
+        </section>
+
+        <!-- Filtres contrat -->
+        <section class="sidebar-section">
+            <h2 class="sidebar-titre">📋 Type de contrat</h2>
+            <div id="filtres-contrats" role="group" aria-label="Filtrer par type de contrat">
+                <!-- Généré par JS -->
+            </div>
+        </section>
+
+        <!-- Filtres mots-clés -->
+        <section class="sidebar-section">
+            <h2 class="sidebar-titre">🏷️ Mots-clés</h2>
+            <div id="filtres-mots-cles" role="group" aria-label="Filtrer par mot-clé">
+                <!-- Généré par JS -->
+            </div>
+        </section>
+
+        <!-- Bouton reset filtres -->
+        <div class="sidebar-section" style="border-bottom:none;">
+            <button id="btn-reset-filtres" aria-label="Réinitialiser tous les filtres">
+                🔄 Réinitialiser les filtres
+            </button>
+        </div>
+
+        <!-- Alertes Angers -->
+        <section class="sidebar-section">
+            <h2 class="sidebar-titre">
+                🔔 Alertes Angers (49)
+            </h2>
+            <div class="alerte-angers-header">
+                <span style="font-size:0.82rem;color:var(--texte-secondaire);">
+                    Maine-et-Loire — zone prioritaire
+                </span>
+            </div>
+            <div id="mention-email" class="mention-email" aria-live="polite"></div>
+            <div id="panneau-alertes" aria-live="polite">
+                <div class="alerte-vide">
+                    <span class="alerte-vide-icone">🔍</span>
+                    <p>Aucune offre pour Angers pour le moment</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Liens vers les plateformes -->
+        <section class="sidebar-section" style="border-bottom:none;">
+            <h2 class="sidebar-titre">🌐 Chercher aussi sur</h2>
+            <nav id="liens-plateformes" aria-label="Liens vers les plateformes d'emploi">
+                <!-- Généré par JS -->
+            </nav>
+        </section>
+
+    </aside>
+
+    <!-- ===== ZONE PRINCIPALE ===== -->
+    <main id="main" role="main" aria-label="Offres d'emploi">
+
+        <!-- Grille des offres -->
+        <section id="grille-offres" aria-label="Liste des offres d'emploi">
+            <!-- Contenu initial avant chargement -->
+            <div class="offres-vides">
+                <div class="offres-vides-icone">✨</div>
+                <h3>Bienvenue sur My Dream Job !</h3>
+                <p>
+                    Configurez vos clés API pour commencer à chercher des offres d'emploi
+                    en temps réel dans les Pays de la Loire.
+                </p>
+                <button class="btn-primaire" onclick="APP._afficherModalConfig()">
+                    ⚙️ Configurer l'API France Travail
+                </button>
+            </div>
+        </section>
+
+    </main>
+</div>
+
+<!-- ===================== MODAL CONFIGURATION ===================== -->
+<div id="modal-config" class="modal-config" role="dialog" aria-modal="true" aria-labelledby="modal-config-titre-text">
+    <div class="modal-config-overlay" id="modal-config-overlay"></div>
+    <div class="modal-config-content">
+        <div class="modal-config-header">
+            <div class="modal-config-titre">
+                <span aria-hidden="true">⚙️</span>
+                <h2 id="modal-config-titre-text">Configuration des APIs</h2>
+            </div>
+            <button class="modal-config-fermer" id="modal-config-fermer" aria-label="Fermer la configuration">✕</button>
+        </div>
+
+        <!-- API France Travail -->
+        <div class="config-section-titre">🏛️ API France Travail (obligatoire pour les offres)</div>
+
+        <p style="font-size:0.85rem;color:var(--texte-secondaire);margin-bottom:16px;line-height:1.6;">
+            L'API France Travail (ex Pôle Emploi) est <strong>gratuite</strong>. Pour obtenir vos identifiants :
+            <br>1. Rendez-vous sur <a href="https://francetravail.io/data/api/offres-emploi" target="_blank" rel="noopener">francetravail.io</a>
+            <br>2. Créez un compte et inscrivez votre application
+            <br>3. Copiez votre <em>Client ID</em> et <em>Client Secret</em>
+        </p>
+
+        <div class="form-groupe">
+            <label class="form-label" for="config-ft-client-id">Client ID France Travail</label>
+            <input type="text" id="config-ft-client-id" class="form-input"
+                placeholder="PAR_xxxxxxxxxxx" autocomplete="off" spellcheck="false">
+        </div>
+
+        <div class="form-groupe">
+            <label class="form-label" for="config-ft-client-secret">Client Secret France Travail</label>
+            <input type="password" id="config-ft-client-secret" class="form-input"
+                placeholder="Votre client secret" autocomplete="off">
+        </div>
+
+        <!-- API OpenAI -->
+        <div class="config-section-titre">✨ API OpenAI (optionnel — pour l'analyse IA)</div>
+
+        <p style="font-size:0.85rem;color:var(--texte-secondaire);margin-bottom:16px;line-height:1.6;">
+            L'analyse IA utilise <strong>gpt-4o-mini</strong> (économique). Pour obtenir une clé :
+            <br>1. Créez un compte sur <a href="https://platform.openai.com" target="_blank" rel="noopener">platform.openai.com</a>
+            <br>2. Allez dans API Keys et créez une nouvelle clé
+            <br>3. Copiez la clé (commence par <code>sk-</code>)
+        </p>
+
+        <div class="form-groupe">
+            <label class="form-label" for="config-openai-key">Clé API OpenAI</label>
+            <input type="password" id="config-openai-key" class="form-input"
+                placeholder="sk-..." autocomplete="off">
+            <p class="form-aide">🔒 Vos clés sont stockées uniquement dans votre navigateur (localStorage). Elles ne sont jamais envoyées ailleurs.</p>
+        </div>
+
+        <div class="form-actions">
+            <button class="btn-secondaire" id="modal-config-fermer-bas" onclick="APP._fermerModalConfig()">
+                Fermer sans sauvegarder
+            </button>
+            <button class="btn-primaire" id="btn-sauvegarder-config">
+                💾 Sauvegarder et actualiser
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ===================== SCRIPTS ===================== -->
+<script src="config.js"></script>
+<script src="js/api.js"></script>
+<script src="js/filters.js"></script>
+<script src="js/notifications.js"></script>
+<script src="js/ai-advisor.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>
