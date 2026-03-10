@@ -29,6 +29,8 @@ const APP = {
         // Vérifier la configuration au premier lancement
         const configFaite = localStorage.getItem(CONFIG.storage.configDone);
         if (!configFaite) {
+            this._mettreAJourStatutConnexion('attente');
+            this._afficherModeDemo();
             this._afficherModalConfig();
         } else {
             await this.actualiser();
@@ -105,6 +107,15 @@ const APP = {
         this._chargement = true;
         this._afficherChargement(true);
 
+        const clientId = localStorage.getItem(CONFIG.storage.franceTravailClientId);
+        if (!clientId) {
+            this._mettreAJourStatutConnexion('attente');
+            this._afficherModeDemo();
+            this._chargement = false;
+            this._afficherChargement(false);
+            return;
+        }
+
         try {
             // Récupérer les offres depuis France Travail
             const offresRaw = await API.rechercherToutesOffres(progress => {
@@ -133,15 +144,21 @@ const APP = {
             this._reinitialiserCompteARebours();
 
             const nb = this._offres.length;
-            NOTIFICATIONS.afficherToast(
-                nb > 0
-                    ? `✅ ${nb} offre(s) chargée(s) avec succès !`
-                    : '⚠️ Aucune offre trouvée. Vérifiez votre clé API France Travail.',
-                nb > 0 ? 'success' : 'warning'
-            );
+            if (nb > 0) {
+                this._mettreAJourStatutConnexion('connecte');
+                NOTIFICATIONS.afficherToast(`✅ ${nb} offre(s) chargée(s) avec succès !`, 'success');
+            } else {
+                this._mettreAJourStatutConnexion('attente');
+                NOTIFICATIONS.afficherToast('⚠️ Aucune offre trouvée. Vérifiez votre clé API France Travail.', 'warning');
+            }
         } catch (e) {
             console.error('Erreur lors de l\'actualisation :', e);
-            NOTIFICATIONS.afficherToast('❌ Erreur lors du chargement : ' + e.message, 'error');
+            this._mettreAJourStatutConnexion('erreur', e.message);
+            NOTIFICATIONS.afficherToast('❌ Erreur de connexion à France Travail : ' + e.message, 'error');
+            // Afficher le mode démo si aucune offre n'est chargée
+            if (this._offres.length === 0) {
+                this._afficherModeDemo();
+            }
         } finally {
             this._chargement = false;
             this._afficherChargement(false);
@@ -690,6 +707,94 @@ const APP = {
         localStorage.setItem(CONFIG.storage.theme, nouveau);
         const btn = document.getElementById('toggle-theme');
         if (btn) btn.textContent = nouveau === 'sombre' ? '☀️' : '🌙';
+    },
+
+    /**
+     * Mettre à jour l'indicateur de statut de connexion dans le header
+     * @param {'connecte'|'erreur'|'attente'} etat
+     * @param {string} [messageErreur]
+     */
+    _mettreAJourStatutConnexion(etat, messageErreur) {
+        const iconeEl = document.getElementById('statut-connexion-icone');
+        const texteEl = document.getElementById('statut-connexion-texte');
+        const conteneur = document.getElementById('statut-connexion');
+        if (!iconeEl || !texteEl || !conteneur) return;
+
+        conteneur.className = 'stat-item statut-connexion statut-' + etat;
+
+        if (etat === 'connecte') {
+            iconeEl.textContent = '✅';
+            texteEl.textContent = 'Connecté à France Travail';
+            conteneur.title = 'Connecté à l\'API France Travail';
+        } else if (etat === 'erreur') {
+            iconeEl.textContent = '❌';
+            texteEl.textContent = 'Erreur de connexion';
+            conteneur.title = messageErreur
+                ? 'Erreur de connexion à France Travail : ' + messageErreur
+                : 'Erreur de connexion à France Travail';
+        } else {
+            iconeEl.textContent = '⏳';
+            texteEl.textContent = 'En attente de configuration';
+            conteneur.title = 'Configurez vos clés API France Travail pour activer la recherche';
+        }
+    },
+
+    /**
+     * Afficher le mode démo/fallback quand aucune clé API n'est configurée ou que la connexion échoue
+     */
+    _afficherModeDemo() {
+        const grille = document.getElementById('grille-offres');
+        if (!grille) return;
+
+        grille.innerHTML = `
+            <div class="offres-vides mode-demo">
+                <div class="offres-vides-icone">🔑</div>
+                <h3>En attente de configuration</h3>
+                <p class="mode-demo-description">
+                    Configurez vos clés API France Travail pour voir les offres d'emploi en temps réel
+                    dans les Pays de la Loire.
+                </p>
+                <div class="mode-demo-instructions">
+                    <p>📋 <strong>Comment obtenir vos clés gratuites :</strong></p>
+                    <ol>
+                        <li>Rendez-vous sur <a href="https://francetravail.io/data/api/offres-emploi" target="_blank" rel="noopener noreferrer" aria-label="francetravail.io (opens in new tab)">francetravail.io</a></li>
+                        <li>Créez un compte et inscrivez votre application</li>
+                        <li>Copiez votre <em>Client ID</em> et <em>Client Secret</em></li>
+                        <li>Cliquez sur "⚙️ Paramètres" ci-dessous pour les saisir</li>
+                    </ol>
+                </div>
+                <button class="btn-primaire" onclick="APP._afficherModalConfig()">
+                    ⚙️ Configurer l'API France Travail
+                </button>
+                <div class="mode-demo-alternatives">
+                    <p>
+                        💡 <strong>En attendant</strong>, vous pouvez chercher des offres directement sur ces plateformes :
+                    </p>
+                    <nav class="mode-demo-liens" aria-label="Liens vers les plateformes d'emploi">
+                        ${CONFIG.plateformes.map(p => {
+                            // Valider le protocole de l'URL (http/https uniquement)
+                            const urlSafe = /^https?:\/\//.test(p.url) ? p.url : '#';
+                            // Valider la couleur CSS (hex ou rgb uniquement)
+                            const couleurSafe = /^#[0-9a-fA-F]{3,8}$/.test(p.couleur) ? p.couleur : '#3949ab';
+                            return `
+                            <a href="${this._echapper(urlSafe)}"
+                               target="_blank"
+                               rel="noopener noreferrer"
+                               class="lien-plateforme-demo"
+                               aria-label="${this._echapper(p.nom)} (s'ouvre dans un nouvel onglet)"
+                               style="--couleur-plateforme:${couleurSafe}">
+                                <span class="plateforme-icone" aria-hidden="true">${p.icone}</span>
+                                <div>
+                                    <strong>${this._echapper(p.nom)}</strong>
+                                    <span>${this._echapper(p.description)}</span>
+                                </div>
+                                <span class="plateforme-fleche" aria-hidden="true">→</span>
+                            </a>`;
+                        }).join('')}
+                    </nav>
+                </div>
+            </div>
+        `;
     },
 
     /**

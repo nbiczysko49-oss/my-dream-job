@@ -9,7 +9,16 @@ const API = {
     _tokenExpiry: null,
 
     /**
-     * Obtenir un token OAuth2 France Travail
+     * Retourner l'URL préfixée avec le proxy CORS actif si activé
+     */
+    _getProxyUrl(url) {
+        if (!CONFIG.proxy.enabled) return url;
+        const proxyBase = CONFIG.proxy.urls[CONFIG.proxy.currentIndex] || CONFIG.proxy.urls[0];
+        return proxyBase + encodeURIComponent(url);
+    },
+
+    /**
+     * Obtenir un token OAuth2 France Travail via proxy CORS
      */
     async getFranceTravailToken() {
         const clientId = localStorage.getItem(CONFIG.storage.franceTravailClientId);
@@ -33,18 +42,38 @@ const API = {
             scope: CONFIG.franceTravail.scope
         });
 
-        const response = await fetch(CONFIG.franceTravail.tokenUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: params.toString()
-        });
+        // Pour le token (POST), utiliser toujours corsproxy.io qui supporte les requêtes POST
+        const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(CONFIG.franceTravail.tokenUrl);
+
+        let response;
+        try {
+            response = await fetch(proxyUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: params.toString()
+            });
+        } catch (e) {
+            throw new Error('Le proxy CORS ne répond pas. Vérifiez votre connexion internet. (' + e.message + ')');
+        }
+
+        if (response.status === 401 || response.status === 403) {
+            throw new Error('Client ID ou Secret invalide. Vérifiez vos clés API France Travail.');
+        }
 
         if (!response.ok) {
-            throw new Error(`Erreur authentification France Travail : ${response.status}`);
+            let detail = '';
+            try {
+                const errData = await response.json();
+                detail = errData.error_description || errData.error || '';
+            } catch (_) {}
+            throw new Error(`Erreur authentification France Travail (${response.status})${detail ? ' : ' + detail : ''}`);
         }
 
         const data = await response.json();
         const token = data.access_token;
+        if (!token) {
+            throw new Error('Réponse inattendue de France Travail : aucun token reçu');
+        }
         const expiresIn = (data.expires_in || 1490) * 1000;
 
         // Sauvegarder le token
@@ -75,18 +104,25 @@ const API = {
             sort: '1'
         });
 
+        const searchUrl = `${CONFIG.franceTravail.searchUrl}?${params.toString()}`;
+        const proxyUrl = this._getProxyUrl(searchUrl);
+
         try {
-            const response = await fetch(
-                `${CONFIG.franceTravail.searchUrl}?${params.toString()}`,
-                {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Accept': 'application/json'
-                    }
+            const response = await fetch(proxyUrl, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'application/json'
                 }
-            );
+            });
 
             if (response.status === 204) return []; // Aucune offre
+            if (response.status === 401) {
+                // Token expiré, effacer le cache
+                localStorage.removeItem(CONFIG.storage.franceTravailToken);
+                localStorage.removeItem(CONFIG.storage.franceTravailTokenExpiry);
+                console.warn(`Token France Travail expiré, il sera renouvelé à la prochaine requête`);
+                return [];
+            }
             if (!response.ok) {
                 console.warn(`Erreur API France Travail (${departement}/${motCle}) : ${response.status}`);
                 return [];
