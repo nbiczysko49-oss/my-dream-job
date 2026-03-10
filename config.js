@@ -45,6 +45,17 @@ const CONFIG = {
     // Termes à exclure (alternance, stage)
     termesExclus: ['alternance', 'stage', 'apprentissage', 'apprenti', 'alternant'],
 
+    // Proxy CORS pour contourner les restrictions CORS du navigateur
+    proxy: {
+        // Liste de proxies CORS gratuits (fallback si l'un ne fonctionne pas)
+        urls: [
+            'https://corsproxy.io/?',
+            'https://api.allorigins.win/raw?url=',
+        ],
+        currentIndex: 0,
+        enabled: true
+    },
+
     // API France Travail
     franceTravail: {
         tokenUrl: 'https://entreprise.francetravail.fr/connexion/oauth2/access_token?realm=/partenaire',
